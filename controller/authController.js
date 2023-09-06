@@ -4,9 +4,11 @@ const { success, failure } = require('../utils/success-error')
 const express = require('express')
 const { validationResult } = require('express-validator')
 const HTTP_STATUS = require("../constants/statusCode");
-const bcrypt = require("bcrypt")
+const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
-const { default: mongoose } = require('mongoose')
+const mongoose = require('mongoose')
+const fs = require('fs')
+const randomString = require('randomstring')
 
 class AuthController {
 
@@ -25,6 +27,47 @@ class AuthController {
         }
     }
 
+    async refresh(req, res) {
+        try {
+            const {reader_email} = req.body
+            const emailExists = await authModel.findOne({reader_email})
+
+            if(emailExists) {
+                console.log("yes")
+                const secretKey = process.env.JWT_SECRET
+                const newSecretKey = randomString.generate()
+
+                fs.readFile("./.env", "utf-8", (err, data)=> {
+                    if(err) throw err
+
+                    var newValue = data.replace(new RegExp(secretKey, "g"), newSecretKey)
+
+                    fs.writeFile("./.env", newValue, "utf-8", (err, data)=> {
+                        if(err) throw err
+                        // console.log(newValue)
+                        console.log("Done!")
+                    })
+                })
+
+                const newToken = jwt.sign({reader_email}, newSecretKey, {expiresIn: '1h'})
+                // console.log(newSecretKey)
+                const response = {
+                    reader_email: reader_email,
+                    token: newToken
+                }
+                return res.status(200).send(success("Refresh successful", response))
+            }
+        } catch(error) {
+            if (error instanceof jwt.JsonWebTokenError) {
+                return res.status(500).send(failure("Token is invalid", error))
+            }
+            if (error instanceof jwt.TokenExpiredError) {
+                return res.status(500).send(failure("Token is expired", error))
+            }
+            return res.status(500).send(failure("Internal server error in refresh", error))
+        }
+    }
+
     async login(req, res) {
         try {
             const { reader_email, password } = req.body
@@ -38,12 +81,12 @@ class AuthController {
             // the future time when a user can log in again is saved in timeToLogin which is 15 seconds following the last updateAt value.
             const timeToLogin = new Date(auth.updatedAt.getTime() + 15 * 1000);
             if (auth.loginAttempt >= 3) {
-                console.log("Too many failed login attempts. Try again in 5 seconds")
-                if (currentTime >= timeToLogin) {
+                console.log("Too many failed login attempts. Try again in " + (timeToLogin - currentTime) / 1000 + " seconds")
+                if ((timeToLogin - currentTime) / 1000 <= 0) {
                     auth.loginAttempt = 0;
                     await auth.save();
                 }
-                return res.status(401).send(failure(`Too many login attempts. Try again in seconds.`));
+                return res.status(401).send(failure(`Too many login attempts. Try again in ${(timeToLogin - currentTime) / 1000} seconds.`));
             }
             // if user tries to log in with wrong password, the loginAttempt property will increase 
             auth.loginAttempt++

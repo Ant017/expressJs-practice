@@ -49,14 +49,14 @@ class bookController {
     async getAll(req, res) {
         try {
             // console.log(req.name)
-            const result = await bookModel.find({});
+            const result = await bookModel.find(req.query).sort("-price").select(["title", "price","-_id"]);
             console.log(result)
             if (result.length > 0) {
                 return res
                     .status(200)
-                    .send(success("Successfully received all readers", { reader: result, total: result.length }));
+                    .send(success("Successfully received all books", { reader: result, total: result.length }));
             }
-            return res.status(500).send(success("No readers were found"));
+            return res.status(500).send(success("No book was found"));
 
         } catch (error) {
             res.status(500).send(failure(error.message))

@@ -11,11 +11,12 @@ const Auth = require('../model/auth')
 
 routes.post("/signup", readerValidation.signup, AuthController.create, AuthController.signup)
 routes.post("/login", AuthController.login)
+routes.post("/refresh", checkLogin, authController.refresh)
 
-routes.post("/add-book", checkLogin, isAdmin, bookController.add)
+routes.post("/add-book", bookController.add)
 routes.get("/get-all-books", bookController.getAll)
-routes.get("/get-book-by-id", checkLogin, isAdmin, bookController.getOneById)
-routes.delete("/del-book-by-id", checkLogin, isAdmin, bookController.deleteOneById)
+routes.get("/get-book-by-id/:id", bookController.getOneById)
+routes.delete("/del-book-by-id/:id", checkLogin, isAdmin, bookController.deleteOneById)
 
 routes.post("/add-reader", checkLogin, readerValidation.create, readerController.create, readerController.add)
 
